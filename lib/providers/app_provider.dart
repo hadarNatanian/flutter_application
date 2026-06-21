@@ -22,6 +22,8 @@ class AppProvider extends ChangeNotifier {
 
   String _filterLocation = '';
   String get filterLocation => _filterLocation;
+  int _tabIndex = 0;             
+  int get tabIndex => _tabIndex;
 
   AppProvider() {
     _loadPrefs();
@@ -51,6 +53,11 @@ class AppProvider extends ChangeNotifier {
 
   void setFilter(String location) {
     _filterLocation = location;
+    notifyListeners();
+  }
+
+   void setTabIndex(int index) {      
+    _tabIndex = index;
     notifyListeners();
   }
 

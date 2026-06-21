@@ -39,18 +39,25 @@ class MyApp extends StatelessWidget {
       ),
       themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
       // === זה החלק שמוסיפים ===
-      builder: (context, child) {
-        return Consumer<AppProvider>(
-          builder: (context, provider, _) {
-            return MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: TextScaler.linear(provider.fontSize / 14),
-              ),
-              child: child!,
-            );
-          },
-        );
-      },
+  builder: (context, child) {
+  return Consumer<AppProvider>(
+    builder: (context, provider, _) {
+      return TweenAnimationBuilder<double>(
+        tween: Tween<double>(end: provider.fontSize / 14),
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+        builder: (context, scale, _) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(scale),
+            ),
+            child: child!,
+          );
+        },
+      );
+    },
+  );
+},
       // === סוף החלק שמוסיפים ===
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
