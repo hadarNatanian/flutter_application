@@ -20,6 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _locationCtrl = TextEditingController();
   final _imageUrlCtrl = TextEditingController();
   bool _uploading = false;
+  Stream<QuerySnapshot>? _myPostsStream;
 
   Future<void> _submit(AppProvider provider, BuildContext sheetContext) async {
     if (_titleCtrl.text.isEmpty || _contentCtrl.text.isEmpty) return;
@@ -50,7 +51,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (sheetCtx) => StatefulBuilder(
         builder: (ctx, setModalState) => SingleChildScrollView(
           padding: EdgeInsets.only(
@@ -62,23 +64,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('פוסט חדש',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text(
+                'פוסט חדש',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _titleCtrl,
-                decoration: const InputDecoration(labelText: 'כותרת', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'כותרת',
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _locationCtrl,
-                decoration: const InputDecoration(labelText: 'מיקום', border: OutlineInputBorder(), prefixIcon: Icon(Icons.location_on)),
+                decoration: const InputDecoration(
+                  labelText: 'מיקום',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on),
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _contentCtrl,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: 'תיאור המסלול', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'תיאור המסלול',
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -93,7 +107,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _uploading ? null : () => _submit(provider, sheetCtx),
+                  onPressed: _uploading
+                      ? null
+                      : () => _submit(provider, sheetCtx),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2E7D32),
                     foregroundColor: Colors.white,
@@ -108,6 +124,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _myPostsStream = context.read<AppProvider>().getMyPostsStream();
   }
 
   @override
@@ -136,68 +158,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: Column(
         children: [
           // חלק הפרופיל עם סליידר - לא ישתנה
-     Container(
-  color: const Color(0xFFE8F5E9),
-  padding: const EdgeInsets.all(16),
-  child: Column(
-    children: [
-      CircleAvatar(
-        radius: 36,
-        backgroundColor: const Color(0xFF2E7D32),
-        child: Text(
-          (user.displayName ?? user.email ?? 'U')[0].toUpperCase(),
-          style: const TextStyle(fontSize: 28, color: Colors.white),
-        ),
-      ),
-      const SizedBox(height: 8),
-      Text(user.displayName ?? '',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      Text(user.email ?? '', style: const TextStyle(color: Colors.grey)),
-      const SizedBox(height: 12),
-
-      // === כאן בדיוק שמים את הבלוק החדש ===
-      Consumer<AppProvider>(
-        builder: (context, provider, child) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('גודל טקסט: ${provider.fontSize.toInt()}'),
-              Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
-                    activeTrackColor: const Color(0xFF2E7D32),
-                    inactiveTrackColor: Colors.grey[300],
-                    thumbColor: const Color(0xFF2E7D32),
-                    valueIndicatorColor: const Color(0xFF2E7D32),
-                    valueIndicatorTextStyle: const TextStyle(color: Colors.white),
-                  ),
-                  child: Slider(
-                    value: provider.fontSize,
-                    min: 12,
-                    max: 20,
-                    divisions: 8,
-                    onChanged: (value) {
-                      provider.setFontSize(value);
-                    },
+          Container(
+            color: const Color(0xFFE8F5E9),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 36,
+                  backgroundColor: const Color(0xFF2E7D32),
+                  child: Text(
+                    (user.displayName ?? user.email ?? 'U')[0].toUpperCase(),
+                    style: const TextStyle(fontSize: 28, color: Colors.white),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
-      ),
+                const SizedBox(height: 8),
+                Text(
+                  user.displayName ?? '',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  user.email ?? '',
+                  style: const TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
 
-    ],
-  ),
-),
+                // === כאן בדיוק שמים את הבלוק החדש ===
+                Consumer<AppProvider>(
+                  builder: (context, provider, child) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('גודל טקסט: ${provider.fontSize.toInt()}'),
+                        Expanded(
+                          child: SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 10,
+                              ),
+                              overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 20,
+                              ),
+                              activeTrackColor: const Color(0xFF2E7D32),
+                              inactiveTrackColor: Colors.grey[300],
+                              thumbColor: const Color(0xFF2E7D32),
+                              valueIndicatorColor: const Color(0xFF2E7D32),
+                              valueIndicatorTextStyle: const TextStyle(
+                                color: Colors.white,
+                              ),
+                            ),
+                            child: Slider(
+                              value: provider.fontSize,
+                              min: 12,
+                              max: 20,
+                              divisions: 8,
+                              onChanged: (value) {
+                                provider.setFontSize(value);
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
           // רשימת הפוסטים - נפרדת מהסליידר
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: provider.getMyPostsStream(),
+              stream: _myPostsStream,
               builder: (context, snapshot) {
-                if (snapshot.hasError) return const Center(child: Text('שגיאה'));
+                if (snapshot.hasError)
+                  return const Center(child: Text('שגיאה'));
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -214,7 +250,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => DetailScreen(post: posts[i])),
+                        builder: (_) => DetailScreen(post: posts[i]),
+                      ),
                     ),
                   ),
                 );
