@@ -156,6 +156,24 @@ class _DetailScreenState extends State<DetailScreen> {
                     await provider.addComment(
                         widget.post.id, _commentCtrl.text.trim());
                     _commentCtrl.clear();
+                    
+                    // הצגת הודעה ומעבר חזרה
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('התגובה נוספה בהצלחה!'),
+                          backgroundColor: Color(0xFF2E7D32),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                      
+                      // חזרה לעמוד הקודם אחרי זמן קצר
+                      Future.delayed(const Duration(seconds: 1), () {
+                        if (mounted) {
+                          Navigator.pop(context);
+                        }
+                      });
+                    }
                   },
                 ),
               ],

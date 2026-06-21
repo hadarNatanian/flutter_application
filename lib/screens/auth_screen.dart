@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -15,26 +16,137 @@ class _AuthScreenState extends State<AuthScreen> {
   final _nameCtrl = TextEditingController();
   bool _isLogin = true;
   bool _loading = false;
+  bool _rememberMe = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedEmail();
+  }
+
+  Future<void> _loadSavedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('saved_email');
+    final shouldRemember = prefs.getBool('remember_me') ?? false;
+    
+    if (savedEmail != null && shouldRemember) {
+      _emailCtrl.text = savedEmail;
+      setState(() {
+        _rememberMe = true;
+      });
+    }
+  }
+
+  Future<void> _saveEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMe) {
+      await prefs.setString('saved_email', _emailCtrl.text.trim());
+      await prefs.setBool('remember_me', true);
+    } else {
+      await prefs.remove('saved_email');
+      await prefs.setBool('remember_me', false);
+    }
+  }
+
+  Future<void> _checkEmailStatus() async {
+    if (_emailCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'הכנסי כתובת מייל לבדיקה');
+      return;
+    }
+    
+    setState(() { _loading = true; _error = null; });
+    
+    try {
+      final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(
+        _emailCtrl.text.trim(),
+      );
+      
+      if (methods.isEmpty) {
+        setState(() {
+          _error = 'כתובת המייל לא רשומה במערכת. צריך להירשם';
+          _isLogin = false;
+        });
+      } else {
+        setState(() {
+          _error = 'כתובת המייל כבר רשומה. הכנסי סיסמה להתחברות';
+          _isLogin = true;
+        });
+        _passCtrl.clear();
+        // מעביר לשדה הסיסמה
+        FocusScope.of(context).nextFocus();
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() => _error = _getErrorMessage(e.code));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+    switch (errorCode) {
+      case 'user-not-found':
+        return 'לא נמצא משתמש עם כתובת מייל זו';
+      case 'wrong-password':
+        return 'סיסמה לא נכונה';
+      case 'invalid-credential':
+        return 'פרטי ההתחברות שגויים. בדקי את המייל והסיסמה';
+      case 'user-disabled':
+        return 'המשתמש חסום';
+      case 'email-already-in-use':
+        return 'כתובת המייל כבר בשימוש';
+      case 'weak-password':
+        return 'הסיסמה חלשה מדי';
+      case 'invalid-email':
+        return 'כתובת מייל לא תקינה';
+      case 'network-request-failed':
+        return 'בעיית רשת. בדקי את החיבור לאינטרנט';
+      default:
+        return 'שגיאה לא צפויה. נסי שנית';
+    }
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
+    
     try {
       if (_isLogin) {
+        // בדיקה אם המשתמש קיים לפני ניסיון התחברות
+        final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(
+          _emailCtrl.text.trim(),
+        );
+        
+        if (methods.isEmpty) {
+          setState(() => _error = 'כתובת המייל לא רשומה במערכת. האם תרצי להירשם?');
+          return;
+        }
+        
         await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailCtrl.text.trim(),
           password: _passCtrl.text.trim(),
         );
+        await _saveEmail();
       } else {
+        // בדיקה אם המשתמש כבר קיים לפני הרשמה
+        final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(
+          _emailCtrl.text.trim(),
+        );
+        
+        if (methods.isNotEmpty) {
+          setState(() => _error = 'המייל כבר רשום במערכת. נסי להתחבר במקום להירשם.');
+          return;
+        }
+        
         final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailCtrl.text.trim(),
           password: _passCtrl.text.trim(),
         );
         await cred.user?.updateDisplayName(_nameCtrl.text.trim());
+        await _saveEmail();
       }
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message);
+      setState(() => _error = _getErrorMessage(e.code));
+    } catch (e) {
+      setState(() => _error = 'שגיאה לא צפויה. נסי שנית');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -76,26 +188,73 @@ class _AuthScreenState extends State<AuthScreen> {
                       if (!_isLogin)
                         TextFormField(
                           controller: _nameCtrl,
-                          decoration: const InputDecoration(labelText: 'שם מלא', prefixIcon: Icon(Icons.person)),
+                          decoration: const InputDecoration(
+                            labelText: 'שם מלא', 
+                            prefixIcon: Icon(Icons.person),
+                            border: OutlineInputBorder(),
+                          ),
                           validator: (v) => v!.isEmpty ? 'שדה חובה' : null,
                         ),
                       if (!_isLogin) const SizedBox(height: 12),
                       TextFormField(
                         controller: _emailCtrl,
-                        decoration: const InputDecoration(labelText: 'אימייל', prefixIcon: Icon(Icons.email)),
+                        decoration: InputDecoration(
+                          labelText: 'אימייל', 
+                          prefixIcon: const Icon(Icons.email),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.search, color: Color(0xFF2E7D32)),
+                            onPressed: _loading ? null : _checkEmailStatus,
+                            tooltip: 'בדוק אם המייל רשום',
+                          ),
+                        ),
                         keyboardType: TextInputType.emailAddress,
                         validator: (v) => v!.isEmpty ? 'שדה חובה' : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _passCtrl,
-                        decoration: const InputDecoration(labelText: 'סיסמה', prefixIcon: Icon(Icons.lock)),
+                        decoration: const InputDecoration(
+                          labelText: 'סיסמה', 
+                          prefixIcon: Icon(Icons.lock),
+                          border: OutlineInputBorder(),
+                        ),
                         obscureText: true,
-                        validator: (v) => v!.length < 6 ? 'סיסמה קצרה מדי' : null,
+                        validator: (v) => v!.length < 6 ? 'סיסמה צריכה להיות לפחות 6 תווים' : null,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _rememberMe,
+                            onChanged: (value) => setState(() => _rememberMe = value ?? false),
+                            activeColor: const Color(0xFF2E7D32),
+                          ),
+                          const Text('זכור אותי'),
+                        ],
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 12),
-                        Text(_error!, style: const TextStyle(color: Colors.red)),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red[300]!),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error, color: Colors.red, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _error!, 
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 20),
                       SizedBox(
@@ -114,7 +273,12 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () => setState(() => _isLogin = !_isLogin),
+                        onPressed: () {
+                          setState(() {
+                            _isLogin = !_isLogin;
+                            _error = null;
+                          });
+                        },
                         child: Text(_isLogin ? 'אין לך חשבון? הירשמי' : 'כבר רשומה? התחברי'),
                       ),
                     ],

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -17,6 +18,12 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   Map<String, dynamic>? _weather;
   final _filterCtrl = TextEditingController();
+  final _focusNode = FocusNode();
+  String _currentFilter = '';
+  List<Post> _allPosts = [];
+  List<Post> _filteredPosts = [];
+  bool _isFiltering = false;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -24,14 +31,57 @@ class _FeedScreenState extends State<FeedScreen> {
     _fetchWeather();
   }
 
+  @override
+  void dispose() {
+    _filterCtrl.dispose();
+    _focusNode.dispose();
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _fetchWeather() async {
     final data = await WeatherService.getWeather('Jerusalem');
     if (mounted) setState(() => _weather = data);
   }
 
+  void _filterPosts(String query) {
+    // בטל את הטיימר הקודם אם קיים
+    _debounceTimer?.cancel();
+    
+    // עדכן מיידי את מצב הסינון בלי setState
+    _currentFilter = query.trim();
+    _isFiltering = _currentFilter.isNotEmpty;
+    
+    // דחיית עדכון המסך ל-300 מילישניות
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (_currentFilter.isEmpty) {
+        _filteredPosts = List.from(_allPosts);
+      } else {
+        _filteredPosts = _allPosts
+            .where((post) => 
+                post.location.toLowerCase().contains(_currentFilter.toLowerCase()))
+            .toList();
+      }
+      
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+  
+  void _clearFilter() {
+    _debounceTimer?.cancel();
+    _filterCtrl.clear();
+    _currentFilter = '';
+    _filteredPosts = List.from(_allPosts);
+    _isFiltering = false;
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<AppProvider>();
     return Scaffold(
       appBar: AppBar(
         title: const Text('טיולים בטבע 🌿'),
@@ -51,65 +101,148 @@ class _FeedScreenState extends State<FeedScreen> {
                 ],
               ),
             ),
-          IconButton(
-            icon: Icon(provider.darkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: provider.toggleDarkMode,
+          Consumer<AppProvider>(
+            builder: (context, provider, child) {
+              return IconButton(
+                icon: Icon(provider.darkMode ? Icons.light_mode : Icons.dark_mode),
+                onPressed: provider.toggleDarkMode,
+              );
+            },
           ),
         ],
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(10),
-            child: TextField(
-              controller: _filterCtrl,
-              decoration: InputDecoration(
-                hintText: 'סנן לפי מיקום...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _filterCtrl.clear();
-                    provider.setFilter('');
-                  },
+            padding: const EdgeInsets.all(12),
+            child: Card(
+              elevation: 2,
+              child: TextField(
+                controller: _filterCtrl,
+                focusNode: _focusNode,
+                decoration: InputDecoration(
+                  hintText: 'סינון לפי מיקום - הקלידי שם עיר...',
+                  hintStyle: const TextStyle(color: Colors.grey),
+                  prefixIcon: const Icon(Icons.location_on, color: Color(0xFF2E7D32)),
+                  suffixIcon: _isFiltering
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.grey),
+                          onPressed: _clearFilter,
+                        )
+                      : const Icon(Icons.search, color: Colors.grey),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                onChanged: _filterPosts,
+                textInputAction: TextInputAction.search,
+                enableSuggestions: false,
+                autocorrect: false,
               ),
-              onChanged: provider.setFilter,
             ),
           ),
+          if (_isFiltering && _filterCtrl.text.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: const Color(0xFFE8F5E9),
+              child: Row(
+                children: [
+                  const Icon(Icons.filter_list, color: Color(0xFF2E7D32), size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'מסנן לפי מיקום: "${_filterCtrl.text}"',
+                    style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w500),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${_filteredPosts.length} תוצאות',
+                    style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: provider.getPostsStream(),
+              stream: context.read<AppProvider>().getPostsStream(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return _buildOfflineFeed(provider);
+                  return _buildOfflineFeed();
                 }
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                var posts = snapshot.data!.docs
+                
+                _allPosts = snapshot.data!.docs
                     .map((d) => Post.fromFirestore(d))
                     .toList();
-                if (provider.filterLocation.isNotEmpty) {
-                  posts = posts
-                      .where((p) => p.location
-                          .toLowerCase()
-                          .contains(provider.filterLocation.toLowerCase()))
-                      .toList();
+                    
+                // אם אין סינון פעיל, הצג הכל
+                if (_currentFilter.isEmpty) {
+                  _filteredPosts = _allPosts;
+                } else {
+                  // אם יש סינון, השתמש ברשימה המסוננת
+                  _filterPosts(_currentFilter);
                 }
-                if (posts.isEmpty) {
+                
+                if (_filteredPosts.isEmpty && _isFiltering) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.search_off, size: 80, color: Colors.grey),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'אין דברים התואמים לחיפוש שלך!',
+                          style: TextStyle(
+                            fontSize: 18, 
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'חיפשת: "${_filterCtrl.text}"',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF2E7D32),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'נסי להקליד שם עיר אחר או למחוק את החיפוש',
+                          style: TextStyle(color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton.icon(
+                          onPressed: _clearFilter,
+                          icon: const Icon(Icons.clear_all),
+                          label: const Text('נקה חיפוש'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E7D32),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                
+                if (_allPosts.isEmpty) {
                   return const Center(child: Text('אין פוסטים עדיין'));
                 }
+                
                 return ListView.builder(
-                  itemCount: posts.length,
+                  itemCount: _filteredPosts.length,
                   itemBuilder: (_, i) => PostCard(
-                    post: posts[i],
+                    post: _filteredPosts[i],
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => DetailScreen(post: posts[i])),
+                          builder: (_) => DetailScreen(post: _filteredPosts[i])),
                     ),
                   ),
                 );
@@ -121,7 +254,8 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildOfflineFeed(AppProvider provider) {
+  Widget _buildOfflineFeed() {
+    final provider = context.read<AppProvider>();
     final bookmarks = provider.bookmarks;
     if (bookmarks.isEmpty) {
       return const Center(child: Text('אין חיבור לאינטרנט ואין מועדפים שמורים'));
