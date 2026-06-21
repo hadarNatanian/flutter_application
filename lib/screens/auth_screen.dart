@@ -50,38 +50,15 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _checkEmailStatus() async {
-    if (_emailCtrl.text.trim().isEmpty) {
-      setState(() => _error = 'הכנסי כתובת מייל לבדיקה');
-      return;
-    }
-    
-    setState(() { _loading = true; _error = null; });
-    
-    try {
-      final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(
-        _emailCtrl.text.trim(),
-      );
-      
-      if (methods.isEmpty) {
-        setState(() {
-          _error = 'כתובת המייל לא רשומה במערכת. צריך להירשם';
-          _isLogin = false;
-        });
-      } else {
-        setState(() {
-          _error = 'כתובת המייל כבר רשומה. הכנסי סיסמה להתחברות';
-          _isLogin = true;
-        });
-        _passCtrl.clear();
-        // מעביר לשדה הסיסמה
-        FocusScope.of(context).nextFocus();
-      }
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = _getErrorMessage(e.code));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+  if (_emailCtrl.text.trim().isEmpty) {
+    setState(() => _error = 'הכנסי כתובת מייל לבדיקה');
+    return;
   }
+  // אין יותר API לבדיקת קיום מייל מראש - מעבירים פוקוס לסיסמה
+  FocusScope.of(context).nextFocus();
+}
+
+  String _getErrorMessage(String errorCode) {
     switch (errorCode) {
       case 'user-not-found':
         return 'לא נמצא משתמש עם כתובת מייל זו';
@@ -105,52 +82,32 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() { _loading = true; _error = null; });
-    
-    try {
-      if (_isLogin) {
-        // בדיקה אם המשתמש קיים לפני ניסיון התחברות
-        final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(
-          _emailCtrl.text.trim(),
-        );
-        
-        if (methods.isEmpty) {
-          setState(() => _error = 'כתובת המייל לא רשומה במערכת. האם תרצי להירשם?');
-          return;
-        }
-        
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailCtrl.text.trim(),
-          password: _passCtrl.text.trim(),
-        );
-        await _saveEmail();
-      } else {
-        // בדיקה אם המשתמש כבר קיים לפני הרשמה
-        final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(
-          _emailCtrl.text.trim(),
-        );
-        
-        if (methods.isNotEmpty) {
-          setState(() => _error = 'המייל כבר רשום במערכת. נסי להתחבר במקום להירשם.');
-          return;
-        }
-        
-        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _emailCtrl.text.trim(),
-          password: _passCtrl.text.trim(),
-        );
-        await cred.user?.updateDisplayName(_nameCtrl.text.trim());
-        await _saveEmail();
-      }
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = _getErrorMessage(e.code));
-    } catch (e) {
-      setState(() => _error = 'שגיאה לא צפויה. נסי שנית');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+  if (!_formKey.currentState!.validate()) return;
+  setState(() { _loading = true; _error = null; });
+
+  try {
+    if (_isLogin) {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passCtrl.text.trim(),
+      );
+      await _saveEmail();
+    } else {
+      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passCtrl.text.trim(),
+      );
+      await cred.user?.updateDisplayName(_nameCtrl.text.trim());
+      await _saveEmail();
     }
+  } on FirebaseAuthException catch (e) {
+    setState(() => _error = _getErrorMessage(e.code));
+  } catch (e) {
+    setState(() => _error = 'שגיאה לא צפויה. נסי שנית');
+  } finally {
+    if (mounted) setState(() => _loading = false);
   }
+}
 
   @override
   Widget build(BuildContext context) {

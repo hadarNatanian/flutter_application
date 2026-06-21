@@ -38,6 +38,20 @@ class MyApp extends StatelessWidget {
         ),
       ),
       themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
+      // === זה החלק שמוסיפים ===
+      builder: (context, child) {
+        return Consumer<AppProvider>(
+          builder: (context, provider, _) {
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(provider.fontSize / 14),
+              ),
+              child: child!,
+            );
+          },
+        );
+      },
+      // === סוף החלק שמוסיפים ===
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {

@@ -24,11 +24,13 @@ class _FeedScreenState extends State<FeedScreen> {
   List<Post> _filteredPosts = [];
   bool _isFiltering = false;
   Timer? _debounceTimer;
+  Stream<QuerySnapshot>? _postsStream;
 
   @override
   void initState() {
     super.initState();
     _fetchWeather();
+    _postsStream = context.read<AppProvider>().getPostsStream();
   }
 
   @override
@@ -47,28 +49,31 @@ class _FeedScreenState extends State<FeedScreen> {
   void _filterPosts(String query) {
     // בטל את הטיימר הקודם אם קיים
     _debounceTimer?.cancel();
-    
+
     // עדכן מיידי את מצב הסינון בלי setState
     _currentFilter = query.trim();
     _isFiltering = _currentFilter.isNotEmpty;
-    
+
     // דחיית עדכון המסך ל-300 מילישניות
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
       if (_currentFilter.isEmpty) {
         _filteredPosts = List.from(_allPosts);
       } else {
         _filteredPosts = _allPosts
-            .where((post) => 
-                post.location.toLowerCase().contains(_currentFilter.toLowerCase()))
+            .where(
+              (post) => post.location.toLowerCase().contains(
+                _currentFilter.toLowerCase(),
+              ),
+            )
             .toList();
       }
-      
+
       if (mounted) {
         setState(() {});
       }
     });
   }
-  
+
   void _clearFilter() {
     _debounceTimer?.cancel();
     _filterCtrl.clear();
@@ -104,7 +109,9 @@ class _FeedScreenState extends State<FeedScreen> {
           Consumer<AppProvider>(
             builder: (context, provider, child) {
               return IconButton(
-                icon: Icon(provider.darkMode ? Icons.light_mode : Icons.dark_mode),
+                icon: Icon(
+                  provider.darkMode ? Icons.light_mode : Icons.dark_mode,
+                ),
                 onPressed: provider.toggleDarkMode,
               );
             },
@@ -123,7 +130,10 @@ class _FeedScreenState extends State<FeedScreen> {
                 decoration: InputDecoration(
                   hintText: 'סינון לפי מיקום - הקלידי שם עיר...',
                   hintStyle: const TextStyle(color: Colors.grey),
-                  prefixIcon: const Icon(Icons.location_on, color: Color(0xFF2E7D32)),
+                  prefixIcon: const Icon(
+                    Icons.location_on,
+                    color: Color(0xFF2E7D32),
+                  ),
                   suffixIcon: _isFiltering
                       ? IconButton(
                           icon: const Icon(Icons.clear, color: Colors.grey),
@@ -131,7 +141,10 @@ class _FeedScreenState extends State<FeedScreen> {
                         )
                       : const Icon(Icons.search, color: Colors.grey),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
                 onChanged: _filterPosts,
                 textInputAction: TextInputAction.search,
@@ -147,23 +160,33 @@ class _FeedScreenState extends State<FeedScreen> {
               color: const Color(0xFFE8F5E9),
               child: Row(
                 children: [
-                  const Icon(Icons.filter_list, color: Color(0xFF2E7D32), size: 18),
+                  const Icon(
+                    Icons.filter_list,
+                    color: Color(0xFF2E7D32),
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'מסנן לפי מיקום: "${_filterCtrl.text}"',
-                    style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      color: Color(0xFF2E7D32),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const Spacer(),
                   Text(
                     '${_filteredPosts.length} תוצאות',
-                    style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 12),
+                    style: const TextStyle(
+                      color: Color(0xFF2E7D32),
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
             ),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: context.read<AppProvider>().getPostsStream(),
+              stream: _postsStream,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return _buildOfflineFeed();
@@ -171,30 +194,41 @@ class _FeedScreenState extends State<FeedScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                
+
                 _allPosts = snapshot.data!.docs
                     .map((d) => Post.fromFirestore(d))
                     .toList();
-                    
+
+                // אם אין סינון פעיל, הצג הכל
                 // אם אין סינון פעיל, הצג הכל
                 if (_currentFilter.isEmpty) {
                   _filteredPosts = _allPosts;
                 } else {
-                  // אם יש סינון, השתמש ברשימה המסוננת
-                  _filterPosts(_currentFilter);
+                  // סינון ישיר, בלי setState ובלי טיימר - רק חישוב
+                  _filteredPosts = _allPosts
+                      .where(
+                        (post) => post.location.toLowerCase().contains(
+                          _currentFilter.toLowerCase(),
+                        ),
+                      )
+                      .toList();
                 }
-                
+
                 if (_filteredPosts.isEmpty && _isFiltering) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.search_off, size: 80, color: Colors.grey),
+                        const Icon(
+                          Icons.search_off,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
                         const SizedBox(height: 20),
                         const Text(
                           'אין דברים התואמים לחיפוש שלך!',
                           style: TextStyle(
-                            fontSize: 18, 
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.grey,
                           ),
@@ -223,18 +257,21 @@ class _FeedScreenState extends State<FeedScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2E7D32),
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   );
                 }
-                
+
                 if (_allPosts.isEmpty) {
                   return const Center(child: Text('אין פוסטים עדיין'));
                 }
-                
+
                 return ListView.builder(
                   itemCount: _filteredPosts.length,
                   itemBuilder: (_, i) => PostCard(
@@ -242,7 +279,8 @@ class _FeedScreenState extends State<FeedScreen> {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => DetailScreen(post: _filteredPosts[i])),
+                        builder: (_) => DetailScreen(post: _filteredPosts[i]),
+                      ),
                     ),
                   ),
                 );
@@ -258,13 +296,18 @@ class _FeedScreenState extends State<FeedScreen> {
     final provider = context.read<AppProvider>();
     final bookmarks = provider.bookmarks;
     if (bookmarks.isEmpty) {
-      return const Center(child: Text('אין חיבור לאינטרנט ואין מועדפים שמורים'));
+      return const Center(
+        child: Text('אין חיבור לאינטרנט ואין מועדפים שמורים'),
+      );
     }
     return Column(
       children: [
         const Padding(
           padding: EdgeInsets.all(8),
-          child: Text('מצב אופליין - מציג מועדפים', style: TextStyle(color: Colors.orange)),
+          child: Text(
+            'מצב אופליין - מציג מועדפים',
+            style: TextStyle(color: Colors.orange),
+          ),
         ),
         Expanded(
           child: ListView.builder(
@@ -273,7 +316,9 @@ class _FeedScreenState extends State<FeedScreen> {
               post: bookmarks[i],
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => DetailScreen(post: bookmarks[i])),
+                MaterialPageRoute(
+                  builder: (_) => DetailScreen(post: bookmarks[i]),
+                ),
               ),
             ),
           ),

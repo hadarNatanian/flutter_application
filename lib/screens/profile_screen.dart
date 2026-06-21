@@ -136,81 +136,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: Column(
         children: [
           // חלק הפרופיל עם סליידר - לא ישתנה
-          Container(
-            color: const Color(0xFFE8F5E9),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor: const Color(0xFF2E7D32),
-                  child: Text(
-                    (user.displayName ?? user.email ?? 'U')[0].toUpperCase(),
-                    style: const TextStyle(fontSize: 28, color: Colors.white),
+     Container(
+  color: const Color(0xFFE8F5E9),
+  padding: const EdgeInsets.all(16),
+  child: Column(
+    children: [
+      CircleAvatar(
+        radius: 36,
+        backgroundColor: const Color(0xFF2E7D32),
+        child: Text(
+          (user.displayName ?? user.email ?? 'U')[0].toUpperCase(),
+          style: const TextStyle(fontSize: 28, color: Colors.white),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(user.displayName ?? '',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      Text(user.email ?? '', style: const TextStyle(color: Colors.grey)),
+      const SizedBox(height: 12),
+
+      // === כאן בדיוק שמים את הבלוק החדש ===
+      Consumer<AppProvider>(
+        builder: (context, provider, child) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('גודל טקסט: ${provider.fontSize.toInt()}'),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+                    activeTrackColor: const Color(0xFF2E7D32),
+                    inactiveTrackColor: Colors.grey[300],
+                    thumbColor: const Color(0xFF2E7D32),
+                    valueIndicatorColor: const Color(0xFF2E7D32),
+                    valueIndicatorTextStyle: const TextStyle(color: Colors.white),
+                  ),
+                  child: Slider(
+                    value: provider.fontSize,
+                    min: 12,
+                    max: 20,
+                    divisions: 8,
+                    onChanged: (value) {
+                      provider.setFontSize(value);
+                    },
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(user.displayName ?? '',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text(user.email ?? '', style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 12),
-                // סליידר עם Consumer נפרד
-                Consumer<AppProvider>(
-                  builder: (context, provider, child) {
-                    return Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('גודל טקסט: ${provider.fontSize.toInt()}', 
-                                 style: TextStyle(fontSize: provider.fontSize)),
-                            Expanded(
-                              child: SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
-                                  activeTrackColor: const Color(0xFF2E7D32),
-                                  inactiveTrackColor: Colors.grey[300],
-                                  thumbColor: const Color(0xFF2E7D32),
-                                  valueIndicatorColor: const Color(0xFF2E7D32),
-                                  valueIndicatorTextStyle: const TextStyle(color: Colors.white),
-                                ),
-                                child: Slider(
-                                  value: provider.fontSize,
-                                  min: 12,
-                                  max: 20,
-                                  divisions: 8,
-                                  onChanged: (value) {
-                                    provider.setFontSize(value);
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'דוגמה לטקסט בגודל שנבחר',
-                          style: TextStyle(
-                            fontSize: provider.fontSize,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(12),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text('הפוסטים שלי',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-          ),
+              ),
+            ],
+          );
+        },
+      ),
+
+    ],
+  ),
+),
           // רשימת הפוסטים - נפרדת מהסליידר
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
