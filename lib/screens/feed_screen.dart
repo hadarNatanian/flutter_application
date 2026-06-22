@@ -198,13 +198,9 @@ class _FeedScreenState extends State<FeedScreen> {
                 _allPosts = snapshot.data!.docs
                     .map((d) => Post.fromFirestore(d))
                     .toList();
-
-                // אם אין סינון פעיל, הצג הכל
-                // אם אין סינון פעיל, הצג הכל
                 if (_currentFilter.isEmpty) {
                   _filteredPosts = _allPosts;
                 } else {
-                  // סינון ישיר, בלי setState ובלי טיימר - רק חישוב
                   _filteredPosts = _allPosts
                       .where(
                         (post) => post.location.toLowerCase().contains(

@@ -58,7 +58,6 @@ class MyApp extends StatelessWidget {
     },
   );
 },
-      // === סוף החלק שמוסיפים ===
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {

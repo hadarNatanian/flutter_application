@@ -157,7 +157,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: Column(
         children: [
-          // חלק הפרופיל עם סליידר - לא ישתנה
           Container(
             color: const Color(0xFFE8F5E9),
             padding: const EdgeInsets.all(16),
@@ -185,7 +184,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // === כאן בדיוק שמים את הבלוק החדש ===
                 Consumer<AppProvider>(
                   builder: (context, provider, child) {
                     return Row(
@@ -227,7 +225,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-          // רשימת הפוסטים - נפרדת מהסליידר
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _myPostsStream,

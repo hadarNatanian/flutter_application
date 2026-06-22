@@ -54,7 +54,6 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() => _error = 'הכנסי כתובת מייל לבדיקה');
     return;
   }
-  // אין יותר API לבדיקת קיום מייל מראש - מעבירים פוקוס לסיסמה
   FocusScope.of(context).nextFocus();
 }
 
